@@ -68,7 +68,7 @@ describe('unified access gates', () => {
     expect(lastMarkdown(channel)).toContain('仅管理员可用');
   });
 
-  it('does not apply IM access gates to cloud-doc comment mentions', async () => {
+  it('applies the same access gate to cloud-doc comment mentions as to DMs', async () => {
     const root = await makeRoot();
     const calls: string[] = [];
     const channel = {
@@ -119,7 +119,9 @@ describe('unified access gates', () => {
       controls: makeControls({ owner: 'ou_owner' }),
     });
 
-    expect(calls).toEqual(['wiki.getNode', 'fileComment.get']);
+    // SECURITY (fork patch): an outsider (not owner, not allowlisted) must be
+    // denied on the comment path too — no doc API calls, no run.
+    expect(calls).toEqual([]);
   });
 });
 

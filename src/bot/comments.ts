@@ -8,6 +8,7 @@ import { getAgentStopGraceMs } from '../config/schema';
 import type { Controls } from '../commands';
 import { resolveAppPaths } from '../config/app-paths';
 import { log } from '../core/logger';
+import { canUseDm } from '../policy/access';
 import { evaluateRunPolicy } from '../policy/run-policy';
 import { resolveWorkingDirectory } from '../policy/workspace';
 import { RunRejected } from '../runtime/errors';
@@ -124,6 +125,20 @@ export async function handleCommentMention(deps: CommentDeps): Promise<void> {
     });
     return;
   }
+  // SECURITY (fork patch): the comment-mention path must NOT bypass the
+  // allowlist. Upstream hardcoded `access: { ok: true }` here, which let
+  // anyone who could @-mention the bot on a shared doc trigger a run on this
+  // machine. Enforce the same owner/allowedUsers/admins check as DMs so only
+  // authorized people can drive the host.
+  const commentAccess = canUseDm(controls.profileConfig, controls, evt.operator.openId);
+  if (!commentAccess.ok) {
+    log.warn('comment', 'access-denied', {
+      reason: commentAccess.reason,
+      sender: evt.operator.openId,
+      commentScopeId: eventCommentScopeId,
+    });
+    return;
+  }
   const target = await resolveCommentTarget(channel, evt);
   if (!target) {
     log.info('comment', 'skip', { reason: 'unsupported-target', commentScopeId: eventCommentScopeId });
@@ -215,6 +230,10 @@ export async function handleCommentMention(deps: CommentDeps): Promise<void> {
       prompt,
       requestedCwd,
       cwdRealpath,
+      // NOTE: access is already enforced by the canUseDm gate at the top of
+      // this handler (unauthorized senders return early). Keep the original
+      // 'comment-mention' reason here so the downstream session/thread
+      // fingerprint (run-policy.ts accessDigest) stays identical to upstream.
       access: { ok: true, reason: 'comment-mention' },
       capability,
       profileConfig: controls.profileConfig,

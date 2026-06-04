@@ -37,13 +37,29 @@ describe('comment guard', () => {
     await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
   });
 
-  it('runs mentioned comments without comment gates, allowlist, bindings, or IM access', async () => {
+  it('denies comment mentions from users outside the allowlist before any remote fetch', async () => {
+    // SECURITY (fork patch): the comment path must enforce the same allowlist
+    // as DMs. An outsider (not owner, not in allowedUsers) must NOT trigger a
+    // run on the host, and we must bail before touching the doc API.
     const h = await createHarness({
       comments: {},
       allowedUsers: [],
     });
 
     await handleCommentMention(h.deps(event({ operator: { openId: 'ou-outsider' } })));
+
+    expect(h.channel.calls).toEqual([]);
+    expect(h.agent.runOptions).toEqual([]);
+    expect(h.channel.replies).toEqual([]);
+  });
+
+  it('runs comment mentions from allowlisted users', async () => {
+    const h = await createHarness({
+      comments: {},
+      allowedUsers: ['ou-user'],
+    });
+
+    await handleCommentMention(h.deps(event({ operator: { openId: 'ou-user' } })));
 
     expect(h.channel.calls).toContain('fileComment.get');
     expect(h.agent.runOptions).toHaveLength(1);
@@ -68,7 +84,7 @@ describe('comment guard', () => {
   it('resolves wiki nodes and falls back to the event token when wiki lookup misses', async () => {
     const h = await createHarness({
       comments: {},
-      allowedUsers: [],
+      allowedUsers: ['ou-user'],
       wikiNode: { objToken: 'doc-token', objType: 'docx', spaceId: 'space-1' },
     });
 
@@ -79,7 +95,7 @@ describe('comment guard', () => {
 
     const passthrough = await createHarness({
       comments: {},
-      allowedUsers: [],
+      allowedUsers: ['ou-user'],
     });
 
     await handleCommentMention(passthrough.deps(event()));
