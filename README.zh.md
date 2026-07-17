@@ -341,5 +341,3 @@ export default createAdapter;
 ## 许可
 
 [MIT](./LICENSE)
-
-<img src="./assets/feedback-group-qr.png" alt="飞书反馈群二维码" width="360">

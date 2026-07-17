@@ -341,5 +341,3 @@ A missing module, a bad factory, or a throwing adapter all degrade to noop — t
 ## License
 
 [MIT](./LICENSE)
-
-<img src="./assets/feedback-group-qr.png" alt="Feedback group QR code" width="360">
